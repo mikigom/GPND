@@ -250,7 +250,7 @@ def main(dataset_name, inliner_class):
             resultsample = G(sample).cpu()
             directory = 'results' + str(inliner_class)
             os.makedirs(directory, exist_ok=True)
-            save_image(resultsample.view(64, 1, 32, 32),
+            save_image(resultsample.view(64, 3, 32, 32),
                        'results' + str(inliner_class) + '/sample_' + str(epoch) + '.png')
 
     print("Training finish!... save training results")

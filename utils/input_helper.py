@@ -60,7 +60,7 @@ class keras_inbuilt_dataset(object):
                 images = x_train[y_train == normal_class_label]
             labels = y_train[y_train == normal_class_label]
 
-        self.images = (images - 127.5) / 127.5
+        self.images = images / 255.
         self.labels = labels
         self.batch_size = batch_size
         self.num_samples = len(self.images)
