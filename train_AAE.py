@@ -96,6 +96,7 @@ def main(dataset_name, inliner_class):
     if dataset_name == 'catdog':
         is_catdog = True
         img_size = 64
+        zsize *= 4
     else:
         img_size = 32
         is_catdog = False
@@ -133,7 +134,12 @@ def main(dataset_name, inliner_class):
     GE_optimizer = optim.Adam(list(E.parameters()) + list(G.parameters()), lr=lr, betas=(0.5, 0.999))
     ZD_optimizer = optim.Adam(ZD.parameters(), lr=lr, betas=(0.5, 0.999))
 
-    train_epoch = 80
+    if is_catdog:
+        train_epoch = 120
+        lr_decay_period = 50
+    else:
+        train_epoch = 80
+        lr_decay_period = 30
 
     BCE_loss = torch.nn.BCELoss()
     y_real_ = torch.ones(batch_size)
@@ -158,7 +164,7 @@ def main(dataset_name, inliner_class):
 
         epoch_start_time = time.time()
 
-        if (epoch + 1) % 30 == 0:
+        if (epoch + 1) % lr_decay_period == 0:
             G_optimizer.param_groups[0]['lr'] /= 4
             D_optimizer.param_groups[0]['lr'] /= 4
             GE_optimizer.param_groups[0]['lr'] /= 4
@@ -283,7 +289,6 @@ def main(dataset_name, inliner_class):
 
 
 if __name__ == '__main__':
-    main(dataset_name='catdog', inliner_class=0)
     """
     for i in range(5):
         for j in range(10):
@@ -292,6 +297,8 @@ if __name__ == '__main__':
             main(dataset_name='cifar100', inliner_class=j)
         for j in range(10):
             main(dataset_name='fashion_mnist', inliner_class=j)
+    """
+
+    for i in range(5):
         for j in range(2):
             main(dataset_name='catdog', inliner_class=j)
-    """

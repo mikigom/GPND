@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from keras.datasets import cifar10, cifar100, fashion_mnist
 
-CATDOG_PATH = "/mnt/workspace/sjh/anomaly-gpnd/dataset_utils/cat_dog/dogs-vs-cats/train"
+CATDOG_PATH = "/mnt/nas/workspace/sjh/anomaly-gpnd/dataset_utils/cat_dog/dogs-vs-cats/train"
 CATDOG_LABEL = {"cat": 0, "dog": 1}
 
 

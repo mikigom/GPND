@@ -16,7 +16,6 @@
 from __future__ import print_function
 
 import pickle
-import random
 
 import matplotlib
 import numpy as np
@@ -26,6 +25,7 @@ from torch.autograd.gradcheck import zero_gradients
 from torchvision.utils import save_image
 
 from net import *
+from utils import input_helper
 
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -110,73 +110,55 @@ def GetF1(true_positive, false_positive, false_negative):
     return 2.0 * precision * recall / (precision + recall)
 
 
-def main(folding_id, inliner_classes, total_classes, folds=5):
+def main(dataset_name, inliner_class, saved_model_ckpt_dir):
     batch_size = 64
-    mnist_train = []
-    mnist_valid = []
     z_size = 32
 
-    def shuffle_in_unison(a, b):
-        assert len(a) == len(b)
-        shuffled_a = np.empty(a.shape, dtype=a.dtype)
-        shuffled_b = np.empty(b.shape, dtype=b.dtype)
-        permutation = np.random.permutation(len(a))
-        for old_index, new_index in enumerate(permutation):
-            shuffled_a[new_index] = a[old_index]
-            shuffled_b[new_index] = b[old_index]
-        return shuffled_a, shuffled_b
+    train_dataset = input_helper.keras_inbuilt_dataset(dataset=dataset_name, normal_class_label=inliner_class,
+                                                       batch_size=batch_size, test=False)
+    test_dataset = input_helper.keras_inbuilt_dataset(dataset=dataset_name, normal_class_label=inliner_class,
+                                                      batch_size=batch_size, test=True)
 
-    outlier_classes = []
-    for i in range(total_classes):
-        if i not in inliner_classes:
-            outlier_classes.append(i)
+    if dataset_name == 'cifar10' or dataset_name == 'cifar100' or dataset_name == 'catdog':
+        channels = 3
+    elif dataset_name == 'fashion_mnist':
+        channels = 1
+    else:
+        raise AttributeError
 
-    for i in range(folds):
-        if i != folding_id:
-            with open('data_fold_%d.pkl' % i, 'rb') as pkl:
-                fold = pickle.load(pkl)
-            if len(mnist_valid) == 0:
-                mnist_valid = fold
-            else:
-                mnist_train += fold
+    if dataset_name == 'catdog':
+        is_catdog = True
+        img_size = 64
+        z_size *= 4
+    else:
+        img_size = 32
+        is_catdog = False
 
-    with open('data_fold_%d.pkl' % folding_id, 'rb') as pkl:
-        mnist_test = pickle.load(pkl)
-
-    # keep only train classes
-    mnist_train = [x for x in mnist_train if x[0] in inliner_classes]
-
-    random.seed(0)
-    random.shuffle(mnist_train)
-
-    def list_of_pairs_to_numpy(l):
-        return np.asarray([x[1] for x in l], np.float32), np.asarray([x[0] for x in l], np.int)
-
-    print("Train set size:", len(mnist_train))
-
-    mnist_train_x, mnist_train_y = list_of_pairs_to_numpy(mnist_train)
-
-    G = Generator(z_size).to(device)
-    E = Encoder(z_size).to(device)
+    G = Generator(z_size, channels=channels, is_catdog=is_catdog).to(device)
+    E = Encoder(z_size, channels=channels, is_catdog=is_catdog).to(device)
     setup(E)
     setup(G)
     G.eval()
     E.eval()
 
-    G.load_state_dict(torch.load("Gmodel.pkl"))
-    E.load_state_dict(torch.load("Emodel.pkl"))
+    G.load_state_dict(torch.load(os.path.join(saved_model_ckpt_dir, "Gmodel.pkl")))
+    E.load_state_dict(torch.load(os.path.join(saved_model_ckpt_dir, "Emodel.pkl")))
 
     sample = torch.randn(64, z_size).to(device)
     sample = G(sample.view(-1, z_size, 1, 1)).cpu()
-    save_image(sample.view(64, 1, 32, 32), 'sample.png')
+    save_image(sample.view(64, channels, img_size, img_size), 'sample.png')
 
     if True:
         zlist = []
         rlist = []
 
-        for it in range(len(mnist_train_x) // batch_size):
-            x = Variable(extract_batch(mnist_train_x, it, batch_size).view(-1, 32 * 32).data, requires_grad=True)
-            z = E(x.view(-1, 1, 32, 32))
+        for it in range(len(train_dataset) // batch_size):
+            x, _ = train_dataset.get_next_batch()
+            x = np.moveaxis(x, source=3, destination=1).astype(np.float32)
+            x = Variable(torch.from_numpy(x).to(device).view(-1, channels * img_size * img_size).data,
+                         requires_grad=True)
+
+            z = E(x.view(-1, channels, img_size, img_size))
             recon_batch = G(z)
             z = z.squeeze()
 
@@ -195,10 +177,10 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         data['rlist'] = rlist
         data['zlist'] = zlist
 
-        with open('data.pkl', 'wb') as pkl:
+        with open(os.path.join(saved_model_ckpt_dir, 'data.pkl'), 'wb') as pkl:
             pickle.dump(data, pkl)
 
-    with open('data.pkl', 'rb') as pkl:
+    with open(os.path.join(saved_model_ckpt_dir, 'data.pkl'), 'rb') as pkl:
         data = pickle.load(pkl)
 
     rlist = data['rlist']
@@ -215,8 +197,8 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
     plt.xticks(fontsize=ticks_size)
     plt.yticks(fontsize=ticks_size)
     plt.tight_layout(rect=(0.0, 0.0, 1, 0.95))
-    plt.savefig('mnist_d%d_randomsearch.pdf' % inliner_classes[0])
-    plt.savefig('mnist_d%d_randomsearch.eps' % inliner_classes[0])
+    plt.savefig(os.path.join(saved_model_ckpt_dir, 'd%d_randomsearch.pdf') % inliner_class)
+    plt.savefig(os.path.join(saved_model_ckpt_dir, 'd%d_randomsearch.eps') % inliner_class)
     plt.clf()
     plt.cla()
     plt.close()
@@ -240,8 +222,8 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
     plt.xticks(fontsize=ticks_size)
     plt.yticks(fontsize=ticks_size)
     plt.tight_layout(rect=(0.0, 0.0, 1, 0.95))
-    plt.savefig('mnist_d%d_embeding.pdf' % inliner_classes[0])
-    plt.savefig('mnist_d%d_embeding.eps' % inliner_classes[0])
+    plt.savefig(os.path.join(saved_model_ckpt_dir, 'd%d_embeding.pdf') % inliner_class)
+    plt.savefig(os.path.join(saved_model_ckpt_dir, 'd%d_embeding.eps') % inliner_class)
     plt.clf()
     plt.cla()
     plt.close()
@@ -253,6 +235,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         gennorm_param[1, i] = loc
         gennorm_param[2, i] = scale
 
+    """
     def compute_threshold(mnist_valid, percentage):
         #############################################################################################
         # Searching for threshold on validation set
@@ -279,10 +262,10 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         novel = []
 
         for it in range(len(mnist_valid_x) // batch_size):
-            x = Variable(extract_batch(mnist_valid_x, it, batch_size).view(-1, 32 * 32).data, requires_grad=True)
+            x = Variable(extract_batch(mnist_valid_x, it, batch_size).view(-1, img_size * img_size).data, requires_grad=True)
             label = extract_batch_(mnist_valid_y, it, batch_size)
 
-            z = E(x.view(-1, 1, 32, 32))
+            z = E(x.view(-1, 1, img_size, img_size))
             recon_batch = G(z)
             z = z.squeeze()
 
@@ -309,7 +292,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
                 distance = np.sum(np.power(x[i].flatten() - recon_batch[i].flatten(), power))
 
                 logPe = np.log(r_pdf(distance, bin_edges, counts))  # p_{\|W^{\perp}\|} (\|w^{\perp}\|)
-                logPe -= np.log(distance) * (32 * 32 - z_size)  # \| w^{\perp} \|}^{m-n}
+                logPe -= np.log(distance) * (img_size * img_size - z_size)  # \| w^{\perp} \|}^{m-n}
 
                 P = logD + logPz + logPe
 
@@ -349,41 +332,20 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
         print("Best e: ", best_e)
         return best_e
+    """
 
-    def test(mnist_test, percentage, e):
-        true_positive = 0
-        true_negative = 0
-        false_positive = 0
-        false_negative = 0
-
-        random.shuffle(mnist_test)
-        mnist_test_outlier = [x for x in mnist_test if x[0] in outlier_classes]
-        mnist_test_inliner = [x for x in mnist_test if x[0] in inliner_classes]
-
-        inliner_count = len(mnist_test_inliner)
-        outlier_count = inliner_count * percentage // (100 - percentage)
-
-        if len(mnist_test_outlier) > outlier_count:
-            mnist_test_outlier = mnist_test_outlier[:outlier_count]
-        else:
-            outlier_count = len(mnist_test_outlier)
-            inliner_count = outlier_count * (100 - percentage) // percentage
-            mnist_test_inliner = mnist_test_inliner[:inliner_count]
-
-        mnist_test = mnist_test_outlier + mnist_test_inliner
-        random.shuffle(mnist_test)
-
-        mnist_test_x, mnist_test_y = list_of_pairs_to_numpy(mnist_test)
-
+    def test(test_dataset, percentage=None, e=None):
         count = 0
 
         result = []
 
-        for it in range(len(mnist_test_x) // batch_size):
-            x = Variable(extract_batch(mnist_test_x, it, batch_size).view(-1, 32 * 32).data, requires_grad=True)
-            label = extract_batch_(mnist_test_y, it, batch_size)
+        for it in range(len(test_dataset) // batch_size):
+            x, label = test_dataset.get_next_batch()
+            x = np.moveaxis(x, source=3, destination=1).astype(np.float32)
+            x = Variable(torch.from_numpy(x).to(device).view(-1, channels * img_size * img_size).data,
+                         requires_grad=True)
 
-            z = E(x.view(-1, 1, 32, 32))
+            z = E(x.view(-1, channels, img_size, img_size))
             recon_batch = G(z)
             z = z.squeeze()
 
@@ -412,26 +374,12 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
                 distance = np.sum(np.power(x[i].flatten() - recon_batch[i].flatten(), power))
 
                 logPe = np.log(r_pdf(distance, bin_edges, counts))
-                logPe -= np.log(distance) * (32 * 32 - z_size)
+                logPe -= np.log(distance) * (img_size * img_size - z_size)
 
                 count += 1
 
                 P = logD + logPz + logPe
-
-                if (label[i].item() in inliner_classes) != (P > e):
-                    if not label[i].item() in inliner_classes:
-                        false_positive += 1
-                    if label[i].item() in inliner_classes:
-                        false_negative += 1
-                else:
-                    if label[i].item() in inliner_classes:
-                        true_positive += 1
-                    else:
-                        true_negative += 1
-
-                result.append(((label[i].item() in inliner_classes), P))
-
-        error = 100 * (true_positive + true_negative) / count
+                result.append((label[i], P))
 
         y_true = [x[0] for x in result]
         y_scores = [x[1] for x in result]
@@ -441,13 +389,9 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         except:
             auc = 0
 
-        with open('result_d%d_p%d.pkl' % (inliner_classes[0], percentage), 'wb') as output:
+        with open(os.path.join(saved_model_ckpt_dir, 'result_d%d.pkl') % inliner_class, 'wb') as output:
             pickle.dump(result, output)
 
-        print("Percentage ", percentage)
-        print("Error ", error)
-        f1 = GetF1(true_positive, false_positive, false_negative)
-        print("F1 ", GetF1(true_positive, false_positive, false_negative))
         print("AUC ", auc)
 
         # inliers
@@ -526,25 +470,19 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
         print("auprout: ", auprout)
 
-        with open(os.path.join("results.txt"), "a") as file:
+        with open(os.path.join(saved_model_ckpt_dir, "results.txt"), "a") as file:
             file.write(
-                "Class: %d\n Percentage: %d\n"
-                "Error: %f\n F1: %f\n AUC: %f\nfpr95: %f"
+                "Class: %d\n"
+                "AUC: %f\nfpr95: %f"
                 "\nDetection: %f\nauprin: %f\nauprout: %f\n\n" %
-                (inliner_classes[0], percentage, error, f1, auc, fpr95, error, auprin, auprout))
+                (inliner_class, auc, fpr95, error, auprin, auprout))
 
-        return auc, f1, fpr95, error, auprin, auprout
+        return auc, fpr95, auprin, auprout
 
-    percentages = [10, 20, 30, 40, 50]
-
-    results = {}
-
-    for p in percentages:
-        e = compute_threshold(mnist_valid, p)
-        results[p] = test(mnist_test, p, e)
+    results = test(test_dataset, None, None)
 
     return results
 
 
 if __name__ == '__main__':
-    main(0, [0], 10)
+    main(dataset_name='cifar10', inliner_class=0, saved_model_ckpt_dir='cifar10/0/2019-05-01_01:04:55')
