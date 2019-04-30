@@ -1,4 +1,3 @@
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -65,13 +64,13 @@ class Generator(nn.Module):
     # initializers
     def __init__(self, z_size, d=128, channels=1):
         super(Generator, self).__init__()
-        self.deconv1_1 = nn.ConvTranspose2d(z_size, d*2, 4, 1, 0)
-        self.deconv1_1_bn = nn.BatchNorm2d(d*2)
-        self.deconv1_2 = nn.ConvTranspose2d(10, d*2, 4, 1, 0)
-        self.deconv1_2_bn = nn.BatchNorm2d(d*2)
-        self.deconv2 = nn.ConvTranspose2d(d*2, d*2, 4, 2, 1)
-        self.deconv2_bn = nn.BatchNorm2d(d*2)
-        self.deconv3 = nn.ConvTranspose2d(d*2, d, 4, 2, 1)
+        self.deconv1_1 = nn.ConvTranspose2d(z_size, d * 2, 4, 1, 0)
+        self.deconv1_1_bn = nn.BatchNorm2d(d * 2)
+        self.deconv1_2 = nn.ConvTranspose2d(10, d * 2, 4, 1, 0)
+        self.deconv1_2_bn = nn.BatchNorm2d(d * 2)
+        self.deconv2 = nn.ConvTranspose2d(d * 2, d * 2, 4, 2, 1)
+        self.deconv2_bn = nn.BatchNorm2d(d * 2)
+        self.deconv3 = nn.ConvTranspose2d(d * 2, d, 4, 2, 1)
         self.deconv3_bn = nn.BatchNorm2d(d)
         self.deconv4 = nn.ConvTranspose2d(d, channels, 4, 2, 1)
 
@@ -81,7 +80,7 @@ class Generator(nn.Module):
             normal_init(self._modules[m], mean, std)
 
     # forward method
-    def forward(self, input):#, label):
+    def forward(self, input):  # , label):
         x = F.relu(self.deconv1_1_bn(self.deconv1_1(input)))
         x = F.relu(self.deconv2_bn(self.deconv2(x)))
         x = F.relu(self.deconv3_bn(self.deconv3(x)))
@@ -93,11 +92,11 @@ class Discriminator(nn.Module):
     # initializers
     def __init__(self, d=128, channels=1):
         super(Discriminator, self).__init__()
-        self.conv1_1 = nn.Conv2d(channels, d//2, 4, 2, 1)
-        self.conv2 = nn.Conv2d(d // 2, d*2, 4, 2, 1)
-        self.conv2_bn = nn.BatchNorm2d(d*2)
-        self.conv3 = nn.Conv2d(d*2, d*4, 4, 2, 1)
-        self.conv3_bn = nn.BatchNorm2d(d*4)
+        self.conv1_1 = nn.Conv2d(channels, d // 2, 4, 2, 1)
+        self.conv2 = nn.Conv2d(d // 2, d * 2, 4, 2, 1)
+        self.conv2_bn = nn.BatchNorm2d(d * 2)
+        self.conv3 = nn.Conv2d(d * 2, d * 4, 4, 2, 1)
+        self.conv3_bn = nn.BatchNorm2d(d * 4)
         self.conv4 = nn.Conv2d(d * 4, 1, 4, 1, 0)
 
     # weight_init
@@ -118,11 +117,11 @@ class Encoder(nn.Module):
     # initializers
     def __init__(self, z_size, d=128, channels=1):
         super(Encoder, self).__init__()
-        self.conv1_1 = nn.Conv2d(channels, d//2, 4, 2, 1)
-        self.conv2 = nn.Conv2d(d // 2, d*2, 4, 2, 1)
-        self.conv2_bn = nn.BatchNorm2d(d*2)
-        self.conv3 = nn.Conv2d(d*2, d*4, 4, 2, 1)
-        self.conv3_bn = nn.BatchNorm2d(d*4)
+        self.conv1_1 = nn.Conv2d(channels, d // 2, 4, 2, 1)
+        self.conv2 = nn.Conv2d(d // 2, d * 2, 4, 2, 1)
+        self.conv2_bn = nn.BatchNorm2d(d * 2)
+        self.conv3 = nn.Conv2d(d * 2, d * 4, 4, 2, 1)
+        self.conv3_bn = nn.BatchNorm2d(d * 4)
         self.conv4 = nn.Conv2d(d * 4, z_size, 4, 1, 0)
 
     # weight_init
@@ -175,7 +174,7 @@ class ZDiscriminator_mergebatch(nn.Module):
 
     # forward method
     def forward(self, x):
-        x = F.leaky_relu((self.linear1(x)), 0.2).view(1, -1) # after the second layer all samples are concatenated
+        x = F.leaky_relu((self.linear1(x)), 0.2).view(1, -1)  # after the second layer all samples are concatenated
         x = F.leaky_relu((self.linear2(x)), 0.2)
         x = F.sigmoid(self.linear3(x))
         return x

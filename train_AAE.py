@@ -13,18 +13,20 @@
 # limitations under the License.
 # ==============================================================================
 from __future__ import print_function
+
+import os
+import time
+
+import numpy as np
+import torch
+import torch.nn.functional as F
 import torch.utils.data
 from torch import optim
-from torchvision.utils import save_image
-from net import *
-import torch.nn.functional as F
 from torch.autograd import Variable
-import numpy as np
-import json
-import pickle
-import time
-import random
-import os
+from torchvision.utils import save_image
+
+from net import *
+from utils import input_helper
 
 use_cuda = torch.cuda.is_available()
 
@@ -58,51 +60,33 @@ def numpy2torch(x):
 
 def extract_batch(data, it, batch_size):
     x = numpy2torch(data[it * batch_size:(it + 1) * batch_size, :, :]) / 255.0
-    #x.sub_(0.5).div_(0.5)
+    # x.sub_(0.5).div_(0.5)
     return Variable(x)
 
 
-def main(folding_id, inliner_classes, total_classes, folds=5):
+def main(dataset_name, inliner_class):
     batch_size = 128
     zsize = 32
-    mnist_train = []
-    mnist_valid = []
 
-    for i in range(folds):
-        if i != folding_id:
-            with open('data_fold_%d.pkl' % i, 'rb') as pkl:
-                fold = pickle.load(pkl)
-            if len(mnist_valid) == 0:
-                mnist_valid = fold
-            else:
-                mnist_train += fold
+    dataset = input_helper.keras_inbuilt_dataset(dataset=dataset_name, normal_class_label=inliner_class,
+                                                 batch_size=batch_size)
 
-    outlier_classes = []
-    for i in range(total_classes):
-        if i not in inliner_classes:
-            outlier_classes.append(i)
+    if dataset_name == 'cifar10' or dataset_name == 'cifar100' or dataset == 'catdog':
+        channels = 3
+    elif dataset_name == 'fashion_mnist':
+        channels = 1
+    else:
+        raise AttributeError
 
-    #keep only train classes
-    mnist_train = [x for x in mnist_train if x[0] in inliner_classes]
-
-    random.shuffle(mnist_train)
-
-    def list_of_pairs_to_numpy(l):
-        return np.asarray([x[1] for x in l], np.float32), np.asarray([x[0] for x in l], np.int)
-
-    print("Train set size:", len(mnist_train))
-
-    mnist_train_x, mnist_train_y = list_of_pairs_to_numpy(mnist_train)
-
-    G = Generator(zsize)
+    G = Generator(zsize, channels=channels)
     setup(G)
     G.weight_init(mean=0, std=0.02)
 
-    D = Discriminator()
+    D = Discriminator(channels=channels)
     setup(D)
     D.weight_init(mean=0, std=0.02)
 
-    E = Encoder(zsize)
+    E = Encoder(zsize, channels=channels)
     setup(E)
     E.weight_init(mean=0, std=0.02)
 
@@ -124,10 +108,10 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
     train_epoch = 80
 
-    BCE_loss = nn.BCELoss()
+    BCE_loss = torch.nn.BCELoss()
     y_real_ = torch.ones(batch_size)
     y_fake_ = torch.zeros(batch_size)
-    
+
     y_real_z = torch.ones(1 if zd_merge else batch_size)
     y_fake_z = torch.zeros(1 if zd_merge else batch_size)
 
@@ -147,11 +131,6 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
         epoch_start_time = time.time()
 
-        def shuffle(X):
-            np.take(X, np.random.permutation(X.shape[0]), axis=0, out=X)
-
-        shuffle(mnist_train_x)
-
         if (epoch + 1) % 30 == 0:
             G_optimizer.param_groups[0]['lr'] /= 4
             D_optimizer.param_groups[0]['lr'] /= 4
@@ -160,8 +139,11 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
             ZD_optimizer.param_groups[0]['lr'] /= 4
             print("learning rate change!")
 
-        for it in range(len(mnist_train_x) // batch_size):
-            x = extract_batch(mnist_train_x, it, batch_size).view(-1, 1, 32, 32)
+        for it in range(len(dataset) // batch_size):
+            # [None, H, W, C] -> [None, C, H, W]
+            x, _ = dataset.get_next_batch()
+            x = np.moveaxis(x, source=3, destination=1).astype(np.float32)
+            x = torch.from_numpy(x).to(device)
 
             #############################################
 
@@ -245,30 +227,31 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
             Etrain_loss += E_loss.item()
 
             if it == 0:
-                directory = 'results'+str(inliner_classes[0])
+                directory = 'results' + str(inliner_class)
                 if not os.path.exists(directory):
                     os.makedirs(directory)
                 comparison = torch.cat([x[:64], x_d[:64]])
                 save_image(comparison.cpu(),
-                           'results'+str(inliner_classes[0])+'/reconstruction_' + str(epoch) + '.png', nrow=64)
+                           'results' + str(inliner_class) + '/reconstruction_' + str(epoch) + '.png', nrow=64)
 
-        Gtrain_loss /= (len(mnist_train_x))
-        Dtrain_loss /= (len(mnist_train_x))
-        ZDtrain_loss /= (len(mnist_train_x))
-        GEtrain_loss /= (len(mnist_train_x))
-        Etrain_loss /= (len(mnist_train_x))
+        Gtrain_loss /= (len(dataset))
+        Dtrain_loss /= (len(dataset))
+        ZDtrain_loss /= (len(dataset))
+        GEtrain_loss /= (len(dataset))
+        Etrain_loss /= (len(dataset))
 
         epoch_end_time = time.time()
         per_epoch_ptime = epoch_end_time - epoch_start_time
 
-        print('[%d/%d] - ptime: %.2f, Gloss: %.3f, Dloss: %.3f, ZDloss: %.3f, GEloss: %.3f, Eloss: %.3f' % ((epoch + 1), train_epoch, per_epoch_ptime, Gtrain_loss, Dtrain_loss, ZDtrain_loss, GEtrain_loss, Etrain_loss))
+        print('[%d/%d] - ptime: %.2f, Gloss: %.3f, Dloss: %.3f, ZDloss: %.3f, GEloss: %.3f, Eloss: %.3f' % (
+        (epoch + 1), train_epoch, per_epoch_ptime, Gtrain_loss, Dtrain_loss, ZDtrain_loss, GEtrain_loss, Etrain_loss))
 
         with torch.no_grad():
             resultsample = G(sample).cpu()
-            directory = 'results'+str(inliner_classes[0])
-            os.makedirs(directory, exist_ok = True)
-            save_image(resultsample.view(64, 1, 32, 32), 'results'+str(inliner_classes[0])+'/sample_' + str(epoch) + '.png')
-
+            directory = 'results' + str(inliner_class)
+            os.makedirs(directory, exist_ok=True)
+            save_image(resultsample.view(64, 1, 32, 32),
+                       'results' + str(inliner_class) + '/sample_' + str(epoch) + '.png')
 
     print("Training finish!... save training results")
     torch.save(G.state_dict(), "Gmodel.pkl")
@@ -276,6 +259,6 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
     torch.save(D.state_dict(), "Dmodel.pkl")
     torch.save(ZD.state_dict(), "ZDmodel.pkl")
 
-if __name__ == '__main__':
-    main(0, [0], 10)
 
+if __name__ == '__main__':
+    main(dataset_name='cifar10', inliner_class=0)

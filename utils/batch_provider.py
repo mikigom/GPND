@@ -14,19 +14,16 @@
 # ==============================================================================
 """Batch provider. Returns iterator to batches"""
 
-from random import shuffle
-import matplotlib.pyplot as plt
-from scipy import misc
-import random
-import numpy as np
 import pickle
+from random import shuffle
+
 try:
     import queue
 except ImportError:
     import Queue as queue
 from threading import Thread, Lock, Event
 import logging
-from PIL import Image
+
 try:
     from BytesIO import BytesIO
 except ImportError:
@@ -35,6 +32,7 @@ except ImportError:
 
 class BatchProvider:
     """All in memory batch provider for small datasets that fit RAM"""
+
     def __init__(self, batch_size, items, cycled=True, worker=16, transformation=None):
         self.items = items
         shuffle(self.items)
@@ -51,7 +49,7 @@ class BatchProvider:
         self.quit_event = Event()
 
         self.q = queue.Queue(16)
-        self.batches_n = len(self.items)//self.batch_size
+        self.batches_n = len(self.items) // self.batch_size
         logging.debug("Batches per epoch: {0}", self.batches_n)
 
     def get_batches(self):
@@ -128,11 +126,10 @@ class BatchProvider:
 # For testing
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from utils.cifar10_reader import Reader
 
-    #r = Reader('data/cifar-10-batches-bin')
+    # r = Reader('data/cifar-10-batches-bin')
 
-    #p = BatchProvider(20, r.items)
+    # p = BatchProvider(20, r.items)
     with open('temp/items_train_nuswide_5000.10000.pkl', 'rb') as pkl:
         p = BatchProvider(20, pickle.load(pkl))
 

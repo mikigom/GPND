@@ -1,11 +1,12 @@
-import train_AAE
-import novelty_detector
 import csv
 
+import novelty_detector
+import train_AAE
 
 full_run = True
 
 percentages = [10, 20, 30, 40, 50]
+
 
 def save_results(results):
     f = open("results.csv", 'wt')
@@ -80,6 +81,7 @@ def save_results(results):
             row.append(res_auprout[r] if len(list) > r else '')
         writer.writerow(tuple(row))
     f.close()
+
 
 results = {}
 

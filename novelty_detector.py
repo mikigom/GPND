@@ -14,19 +14,19 @@
 # ==============================================================================
 
 from __future__ import print_function
-import torch.utils.data
-from torch import optim
-from torchvision.utils import save_image
-from net import *
-import torch.nn.functional as F
-from torch.autograd import Variable
-import numpy as np
-import json
+
 import pickle
-import time
 import random
-from torch.autograd.gradcheck import zero_gradients
+
 import matplotlib
+import numpy as np
+import torch.utils.data
+from torch.autograd import Variable
+from torch.autograd.gradcheck import zero_gradients
+from torchvision.utils import save_image
+
+from net import *
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import scipy.stats
@@ -69,7 +69,7 @@ def numpy2torch(x):
 
 def extract_batch(data, it, batch_size):
     x = numpy2torch(data[it * batch_size:(it + 1) * batch_size]) / 255.0
-    #x.sub_(0.5).div_(0.5)
+    # x.sub_(0.5).div_(0.5)
     return Variable(x)
 
 
@@ -143,7 +143,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
     with open('data_fold_%d.pkl' % folding_id, 'rb') as pkl:
         mnist_test = pickle.load(pkl)
 
-    #keep only train classes
+    # keep only train classes
     mnist_train = [x for x in mnist_train if x[0] in inliner_classes]
 
     random.seed(0)
@@ -209,7 +209,8 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
     plt.plot(bin_edges[1:], counts, linewidth=2)
     plt.xlabel(r"Distance, $\left \|\| I - \hat{I} \right \|\|$", fontsize=axis_title_size)
     plt.ylabel('Probability density', fontsize=axis_title_size)
-    plt.title(r"PDF of distance for reconstruction error, $p\left(\left \|\| I - \hat{I} \right \|\| \right)$", fontsize=title_size)
+    plt.title(r"PDF of distance for reconstruction error, $p\left(\left \|\| I - \hat{I} \right \|\| \right)$",
+              fontsize=title_size)
     plt.grid(True)
     plt.xticks(fontsize=ticks_size)
     plt.yticks(fontsize=ticks_size)
@@ -294,7 +295,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
             for i in range(batch_size):
                 u, s, vh = np.linalg.svd(J[i, :, :], full_matrices=False)
-                logD = np.sum(np.log(np.abs(s))) # | \mathrm{det} S^{-1} |
+                logD = np.sum(np.log(np.abs(s)))  # | \mathrm{det} S^{-1} |
 
                 p = scipy.stats.gennorm.pdf(z[i], gennorm_param[0, :], gennorm_param[1, :], gennorm_param[2, :])
                 logPz = np.sum(np.log(p))
@@ -307,8 +308,8 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
 
                 distance = np.sum(np.power(x[i].flatten() - recon_batch[i].flatten(), power))
 
-                logPe = np.log(r_pdf(distance, bin_edges, counts)) # p_{\|W^{\perp}\|} (\|w^{\perp}\|)
-                logPe -= np.log(distance) * (32 * 32 - z_size) # \| w^{\perp} \|}^{m-n}
+                logPe = np.log(r_pdf(distance, bin_edges, counts))  # p_{\|W^{\perp}\|} (\|w^{\perp}\|)
+                logPe -= np.log(distance) * (32 * 32 - z_size)  # \| w^{\perp} \|}^{m-n}
 
                 P = logD + logPz + logPe
 
@@ -449,10 +450,10 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         print("F1 ", GetF1(true_positive, false_positive, false_negative))
         print("AUC ", auc)
 
-        #inliers
+        # inliers
         X1 = [x[1] for x in result if x[0]]
 
-        #outliers
+        # outliers
         Y1 = [x[1] for x in result if not x[0]]
 
         minP = min([x[1] for x in result]) - 1
@@ -498,12 +499,11 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
                 continue
             precision = tp / (tp + fp)
             recall = tp / np.float(len(X1))
-            auprin += (recallTemp-recall)*precision
+            auprin += (recallTemp - recall) * precision
             recallTemp = recall
         auprin += recall * precision
 
         print("auprin: ", auprin)
-
 
         ##################################################################
         # AUPR OUT
@@ -520,7 +520,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
                 continue
             precision = tp / (tp + fp)
             recall = tp / np.float(len(Y1))
-            auprout += (recallTemp-recall)*precision
+            auprout += (recallTemp - recall) * precision
             recallTemp = recall
         auprout += recall * precision
 
@@ -544,6 +544,7 @@ def main(folding_id, inliner_classes, total_classes, folds=5):
         results[p] = test(mnist_test, p, e)
 
     return results
+
 
 if __name__ == '__main__':
     main(0, [0], 10)

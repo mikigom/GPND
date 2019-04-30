@@ -16,12 +16,14 @@
 
 import mmap
 import os
-import numpy as np
 from contextlib import closing
-from scipy import misc
+
+import numpy as np
+
 
 class Reader:
     """Read CIFAR out of binary batches"""
+
     def __init__(self, path, train=True, test=False):
         self.items = []
 
@@ -31,7 +33,7 @@ class Reader:
         width = 32
         depth = 3
         self.__image_bytes = height * width * depth
-        self.__record_bytes = self.__label_bytes + self.__image_bytes # stride of items in bin file
+        self.__record_bytes = self.__label_bytes + self.__image_bytes  # stride of items in bin file
 
         if train:
             self.__read_batch('train.bin', 50000)
@@ -53,7 +55,7 @@ class Reader:
                         label = l
                     img = np.fromstring(
                         m[i * self.__record_bytes + self.__label_bytes
-                          :i * self.__record_bytes + self.__record_bytes], dtype=np.uint8)
+                        :i * self.__record_bytes + self.__record_bytes], dtype=np.uint8)
                     img = np.reshape(img, (3, 32, 32))
                     self.items.append((label, img))
 

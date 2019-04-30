@@ -16,12 +16,15 @@
 
 import mmap
 import os
-import numpy as np
 from contextlib import closing
+
+import numpy as np
 from scipy import misc
+
 
 class Reader:
     """Read MNIST out of binary batches"""
+
     def __init__(self, path, items=None, train=True, test=False, make3channel=False):
         self.items = []
 
@@ -31,7 +34,7 @@ class Reader:
         height = 28
         width = 28
         self.__image_bytes = height * width
-        self.__record_bytes = self.__image_bytes # stride of items in bin file
+        self.__record_bytes = self.__image_bytes  # stride of items in bin file
 
         if items is not None:
             self.items = items
@@ -48,7 +51,7 @@ class Reader:
             ones = np.ones((1, 1, 3), dtype=np.uint8)
         else:
             ones = np.ones((1), dtype=np.uint8)
-		
+
         with open(os.path.join(self.__path, batch_label), 'rb') as f_l:
             with open(os.path.join(self.__path, batch_images), 'rb') as f_i:
                 with closing(mmap.mmap(f_l.fileno(), length=0, access=mmap.ACCESS_READ)) as m_l:
@@ -63,7 +66,7 @@ class Reader:
                                 label = l
                             img = np.fromstring(
                                 m_i[16 + i * self.__record_bytes
-                                  :16 + i * self.__record_bytes + self.__record_bytes], dtype=np.uint8)
+                                :16 + i * self.__record_bytes + self.__record_bytes], dtype=np.uint8)
                             img = np.reshape(img, (28, 28))
                             img = misc.imresize(img, (32, 32), interp='bilinear')
                             self.items.append((label, img))

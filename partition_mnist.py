@@ -1,7 +1,8 @@
+import pickle
+import random
+
 from utils import mnist_reader
 from utils.download import download
-import random
-import pickle
 
 download(directory="mnist", url="http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz", extract_gz=True)
 download(directory="mnist", url="http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz", extract_gz=True)
@@ -10,7 +11,7 @@ download(directory="mnist", url="http://yann.lecun.com/exdb/mnist/t10k-labels-id
 
 folds = 5
 
-#Split mnist into 5 folds:
+# Split mnist into 5 folds:
 mnist = items_train = mnist_reader.Reader('mnist', train=True, test=True).items
 class_bins = {}
 
@@ -31,7 +32,6 @@ for _class, data in class_bins.items():
 
     for i in range(folds):
         mnist_folds[i] += data[i * count_per_fold: (i + 1) * count_per_fold]
-
 
 print("Folds sizes:")
 for i in range(len(mnist_folds)):

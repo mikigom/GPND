@@ -15,12 +15,14 @@
 """Module for downloading files, downloading files from google drive, uncompressing targz"""
 
 from __future__ import print_function
-import os
+
 import cgi
-import tarfile
 import gzip
+import os
 import shutil
+import tarfile
 import zipfile
+
 try:
     from urllib import request
     from http import cookies, cookiejar
@@ -31,7 +33,8 @@ except ImportError:
     import cookielib as cookiejar
 
 
-def download(directory=".", url=None, google_drive_fileid=None, extract_targz=False, extract_gz=False, extract_zip=False, file_name=None):
+def download(directory=".", url=None, google_drive_fileid=None, extract_targz=False, extract_gz=False,
+             extract_zip=False, file_name=None):
     """Downloads a file from provided URL or file id at google drive"""
 
     if url is None and google_drive_fileid is not None:
@@ -54,7 +57,7 @@ def download(directory=".", url=None, google_drive_fileid=None, extract_targz=Fa
 
     if file_name is None:
         cd = meta.get("content-disposition")
-        if cd is not None:  
+        if cd is not None:
             value, params = cgi.parse_header(cd)
             cd_file = params['filename']
             if cd_file is not None:
@@ -94,7 +97,7 @@ def download(directory=".", url=None, google_drive_fileid=None, extract_targz=Fa
                 status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
             else:
                 status = r"%10d" % file_size_dl
-            status += chr(8)*(len(status)+1)
+            status += chr(8) * (len(status) + 1)
             print(status, end='')
 
         print()
@@ -102,10 +105,10 @@ def download(directory=".", url=None, google_drive_fileid=None, extract_targz=Fa
     if extract_targz:
         print("Extracting...")
         tarfile.open(name=file_path, mode="r:gz").extractall(directory)
-        
+
     if extract_gz:
-        file_out_path = file_path.replace('.gz','')
-            
+        file_out_path = file_path.replace('.gz', '')
+
         print("Extracting...")
         with gzip.open(file_path, 'rb') as f_in:
             with open(file_out_path, 'wb') as f_out:
