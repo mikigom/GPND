@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
+# 2019.04.30 Code is modified by Junghoon Seo (@mikigom)
+# for benchmarking on anomaly detection setting.
 from __future__ import print_function
 
 import os
 import time
+import datetime
 
 import numpy as np
 import torch
@@ -58,6 +62,17 @@ def numpy2torch(x):
     return setup(torch.from_numpy(x))
 
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        import errno
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
 def extract_batch(data, it, batch_size):
     x = numpy2torch(data[it * batch_size:(it + 1) * batch_size, :, :]) / 255.0
     # x.sub_(0.5).div_(0.5)
@@ -77,6 +92,11 @@ def main(dataset_name, inliner_class):
         channels = 1
     else:
         raise AttributeError
+
+    exp_path = os.path.join(dataset_name, str(inliner_class), datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
+    mkdir_p(exp_path)
+    sample_directory = os.path.join(exp_path, 'samples')
+    mkdir_p(sample_directory)
 
     G = Generator(zsize, channels=channels)
     setup(G)
@@ -227,12 +247,9 @@ def main(dataset_name, inliner_class):
             Etrain_loss += E_loss.item()
 
             if it == 0:
-                directory = 'results' + str(inliner_class)
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
                 comparison = torch.cat([x[:64], x_d[:64]])
                 save_image(comparison.cpu(),
-                           'results' + str(inliner_class) + '/reconstruction_' + str(epoch) + '.png', nrow=64)
+                           os.path.join(sample_directory, 'reconstruction_' + str(epoch) + '.png'), nrow=64)
 
         Gtrain_loss /= (len(dataset))
         Dtrain_loss /= (len(dataset))
@@ -248,17 +265,26 @@ def main(dataset_name, inliner_class):
 
         with torch.no_grad():
             resultsample = G(sample).cpu()
-            directory = 'results' + str(inliner_class)
-            os.makedirs(directory, exist_ok=True)
-            save_image(resultsample.view(64, 3, 32, 32),
-                       'results' + str(inliner_class) + '/sample_' + str(epoch) + '.png')
+            save_image(resultsample.view(64, channels, 32, 32),
+                       os.path.join(sample_directory, 'sample_' + str(epoch) + '.png'))
 
     print("Training finish!... save training results")
-    torch.save(G.state_dict(), "Gmodel.pkl")
-    torch.save(E.state_dict(), "Emodel.pkl")
-    torch.save(D.state_dict(), "Dmodel.pkl")
-    torch.save(ZD.state_dict(), "ZDmodel.pkl")
+    torch.save(G.state_dict(), os.path.join(exp_path, "Gmodel.pkl"))
+    torch.save(E.state_dict(), os.path.join(exp_path, "Emodel.pkl"))
+    torch.save(D.state_dict(), os.path.join(exp_path, "Dmodel.pkl"))
+    torch.save(ZD.state_dict(), os.path.join(exp_path, "ZDmodel.pkl"))
 
 
 if __name__ == '__main__':
-    main(dataset_name='cifar10', inliner_class=0)
+    main(dataset_name='catdog', inliner_class=0)
+    """
+    for i in range(5):
+        for j in range(10):
+            main(dataset_name='cifar10', inliner_class=j)
+        for j in range(20):
+            main(dataset_name='cifar100', inliner_class=j)
+        for j in range(10):
+            main(dataset_name='fashion_mnist', inliner_class=j)
+        for j in range(2):
+            main(dataset_name='catdog', inliner_class=j)
+    """
