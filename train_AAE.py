@@ -86,34 +86,41 @@ def main(dataset_name, inliner_class):
     dataset = input_helper.keras_inbuilt_dataset(dataset=dataset_name, normal_class_label=inliner_class,
                                                  batch_size=batch_size)
 
-    if dataset_name == 'cifar10' or dataset_name == 'cifar100' or dataset == 'catdog':
+    if dataset_name == 'cifar10' or dataset_name == 'cifar100' or dataset_name == 'catdog':
         channels = 3
     elif dataset_name == 'fashion_mnist':
         channels = 1
     else:
         raise AttributeError
 
+    if dataset_name == 'catdog':
+        is_catdog = True
+        img_size = 64
+    else:
+        img_size = 32
+        is_catdog = False
+
     exp_path = os.path.join(dataset_name, str(inliner_class), datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
     mkdir_p(exp_path)
     sample_directory = os.path.join(exp_path, 'samples')
     mkdir_p(sample_directory)
 
-    G = Generator(zsize, channels=channels)
+    G = Generator(zsize, channels=channels, is_catdog=is_catdog)
     setup(G)
     G.weight_init(mean=0, std=0.02)
 
-    D = Discriminator(channels=channels)
+    D = Discriminator(channels=channels, is_catdog=is_catdog)
     setup(D)
     D.weight_init(mean=0, std=0.02)
 
-    E = Encoder(zsize, channels=channels)
+    E = Encoder(zsize, channels=channels, is_catdog=is_catdog)
     setup(E)
     E.weight_init(mean=0, std=0.02)
 
     if zd_merge:
-        ZD = ZDiscriminator_mergebatch(zsize, batch_size).to(device)
+        ZD = ZDiscriminator_mergebatch(zsize, batch_size, is_catdog=is_catdog).to(device)
     else:
-        ZD = ZDiscriminator(zsize, batch_size).to(device)
+        ZD = ZDiscriminator(zsize, batch_size, is_catdog=is_catdog).to(device)
 
     setup(ZD)
     ZD.weight_init(mean=0, std=0.02)
@@ -265,7 +272,7 @@ def main(dataset_name, inliner_class):
 
         with torch.no_grad():
             resultsample = G(sample).cpu()
-            save_image(resultsample.view(64, channels, 32, 32),
+            save_image(resultsample.view(64, channels, img_size, img_size),
                        os.path.join(sample_directory, 'sample_' + str(epoch) + '.png'))
 
     print("Training finish!... save training results")
