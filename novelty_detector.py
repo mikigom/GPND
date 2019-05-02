@@ -485,4 +485,15 @@ def main(dataset_name, inliner_class, saved_model_ckpt_dir):
 
 
 if __name__ == '__main__':
-    main(dataset_name='cifar10', inliner_class=0, saved_model_ckpt_dir='cifar10/0/2019-05-01_01:04:55')
+    # main(dataset_name='catdog', inliner_class=0, saved_model_ckpt_dir='catdog/0/2019-05-01_01:07:35')
+    ckpts_dir_list = list()
+    for dirName, subdirList, fileList in os.walk('./'):
+        if "Dmodel.pkl" in fileList and "results.txt" not in fileList:
+            print(dirName)
+            ckpts_dir_list.append(dirName)
+
+    for ckpts_dir in ckpts_dir_list:
+        dataset_name, inliner_class, ckpt_datetime = tuple(ckpts_dir.split('/')[1:4])
+        inliner_class = int(inliner_class)
+        print(dataset_name, inliner_class, ckpt_datetime)
+        main(dataset_name=dataset_name, inliner_class=inliner_class, saved_model_ckpt_dir=ckpts_dir)
