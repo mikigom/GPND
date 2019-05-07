@@ -110,7 +110,12 @@ def GetF1(true_positive, false_positive, false_negative):
     return 2.0 * precision * recall / (precision + recall)
 
 
-def main(dataset_name, inliner_class, saved_model_ckpt_dir):
+def main(dataset_name, inliner_class, saved_model_ckpt_dir, gpu):
+    torch.cuda.set_device(gpu)
+    device = torch.cuda.current_device()
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    print("Running on ", torch.cuda.get_device_name(device))
+
     batch_size = 64
     z_size = 32
 
@@ -484,16 +489,44 @@ def main(dataset_name, inliner_class, saved_model_ckpt_dir):
     return results
 
 
+def main_f(dataset_name, inliner_class, ckpts_dir, gpu):
+    main(dataset_name=dataset_name, inliner_class=inliner_class, saved_model_ckpt_dir=ckpts_dir, gpu=gpu)
+
+
 if __name__ == '__main__':
-    # main(dataset_name='catdog', inliner_class=0, saved_model_ckpt_dir='catdog/0/2019-05-01_01:07:35')
+    from multiprocessing import Process
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    torch.multiprocessing.set_start_method('forkserver', force=True)
+
     ckpts_dir_list = list()
-    for dirName, subdirList, fileList in os.walk('./'):
+    for dirName, subdirList, fileList in os.walk('./cifar100'):
         if "Dmodel.pkl" in fileList and "results.txt" not in fileList:
             print(dirName)
             ckpts_dir_list.append(dirName)
 
+    args_list = list()
     for ckpts_dir in ckpts_dir_list:
         dataset_name, inliner_class, ckpt_datetime = tuple(ckpts_dir.split('/')[1:4])
         inliner_class = int(inliner_class)
         print(dataset_name, inliner_class, ckpt_datetime)
-        main(dataset_name=dataset_name, inliner_class=inliner_class, saved_model_ckpt_dir=ckpts_dir)
+        args_list.append((dataset_name, inliner_class, ckpts_dir))
+        # main(dataset_name=dataset_name, inliner_class=inliner_class, saved_model_ckpt_dir=ckpts_dir)
+
+    n_process_per_pool = 16
+    n_gpu = 4
+
+    for i_pool in range(int(len(args_list) / n_process_per_pool)):
+        processes = []
+        for i in range(n_process_per_pool * i_pool, n_process_per_pool * (i_pool + 1)):
+            try:
+                dataset_name, inliner_class, saved_model_ckpt_dir = args_list[i]
+                p = Process(target=main_f, args=(dataset_name, inliner_class, saved_model_ckpt_dir, i % n_gpu))
+                processes.append(p)
+            except IndexError:
+                continue
+        # Start the processes
+        for p in processes:
+            p.start()
+        # Ensure all processes have finished execution
+        for p in processes:
+            p.join()
