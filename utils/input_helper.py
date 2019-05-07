@@ -16,7 +16,7 @@ class keras_inbuilt_dataset(object):
             y_train = y_train[:, 0]
             y_test = y_test[:, 0]
         elif dataset == 'cifar100':
-            (x_train, y_train), (x_test, y_test) = cifar100.load_data()
+            (x_train, y_train), (x_test, y_test) = cifar100.load_data(label_mode='coarse')
             y_train = y_train[:, 0]
             y_test = y_test[:, 0]
         elif dataset == 'fashion_mnist':
