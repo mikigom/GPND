@@ -297,17 +297,19 @@ if __name__ == '__main__':
 
     n_gpu = 4
     n_classes = 20
-    processes = []
+    n_exp = 5
 
-    for i in range(0, n_classes):
-        p = Process(target=main_f, args=('cifar100', i, i % n_gpu))
-        processes.append(p)
-    # Start the processes
-    for p in processes:
-        p.start()
-    # Ensure all processes have finished execution
-    for p in processes:
-        p.join()
+    for _ in range(n_exp):
+        processes = []
+        for i in range(0, n_classes):
+            p = Process(target=main_f, args=('cifar100', i, i % n_gpu))
+            processes.append(p)
+        # Start the processes
+        for p in processes:
+            p.start()
+        # Ensure all processes have finished execution
+        for p in processes:
+            p.join()
 
     """
     for iteration in range(0, int(n_classes / n_gpu)):
