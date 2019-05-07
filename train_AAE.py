@@ -285,9 +285,9 @@ def main(dataset_name, inliner_class, gpu):
     torch.save(ZD.state_dict(), os.path.join(exp_path, "ZDmodel.pkl"))
 
 
-def main_f(inliner_class, gpu):
+def main_f(dataset_name, inliner_class, gpu):
     # NOTE: Do not use lambda function for this.
-    main(dataset_name='cifar100', inliner_class=inliner_class, gpu=gpu)
+    main(dataset_name=dataset_name, inliner_class=inliner_class, gpu=gpu)
 
 
 if __name__ == '__main__':
@@ -300,7 +300,7 @@ if __name__ == '__main__':
     processes = []
 
     for i in range(0, n_classes):
-        p = Process(target=main_f, args=(i, i % n_gpu))
+        p = Process(target=main_f, args=('cifar100', i, i % n_gpu))
         processes.append(p)
     # Start the processes
     for p in processes:
@@ -314,10 +314,10 @@ if __name__ == '__main__':
         for i in range(n_gpu * iteration, n_gpu * (iteration + 1)):
             p = Process(target=main_f, args=(i, i % 4))
             processes.append(p)
-        # Start the processes
-        for p in processes:
-            p.start()
-        # Ensure all processes have finished execution
-        for p in processes:
-            p.join()
+    # Start the processes
+    for p in processes:
+        p.start()
+    # Ensure all processes have finished execution
+    for p in processes:
+        p.join()
     """
