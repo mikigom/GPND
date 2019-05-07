@@ -42,14 +42,6 @@ torch.set_default_tensor_type('torch.FloatTensor')
 # If zd_merge true, will use zd discriminator that looks at entire batch.
 zd_merge = False
 
-if use_cuda:
-    device = torch.cuda.current_device()
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    FloatTensor = torch.cuda.FloatTensor
-    IntTensor = torch.cuda.IntTensor
-    LongTensor = torch.cuda.LongTensor
-    print("Running on ", torch.cuda.get_device_name(device))
-
 
 def setup(x):
     if use_cuda:
@@ -79,7 +71,12 @@ def extract_batch(data, it, batch_size):
     return Variable(x)
 
 
-def main(dataset_name, inliner_class):
+def main(dataset_name, inliner_class, gpu):
+    torch.cuda.set_device(gpu)
+    device = torch.cuda.current_device()
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    print("Running on ", torch.cuda.get_device_name(device))
+
     batch_size = 128
     zsize = 32
 
@@ -288,17 +285,39 @@ def main(dataset_name, inliner_class):
     torch.save(ZD.state_dict(), os.path.join(exp_path, "ZDmodel.pkl"))
 
 
-if __name__ == '__main__':
-    """
-    for i in range(5):
-        for j in range(10):
-            main(dataset_name='cifar10', inliner_class=j)
-        for j in range(20):
-            main(dataset_name='cifar100', inliner_class=j)
-        for j in range(10):
-            main(dataset_name='fashion_mnist', inliner_class=j)
-    """
+def main_f(inliner_class, gpu):
+    # NOTE: Do not use lambda function for this.
+    main(dataset_name='cifar100', inliner_class=inliner_class, gpu=gpu)
 
-    for i in range(5):
-        for j in range(2):
-            main(dataset_name='catdog', inliner_class=j)
+
+if __name__ == '__main__':
+    from multiprocessing import Process
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    torch.multiprocessing.set_start_method('forkserver', force=True)
+
+    n_gpu = 4
+    n_classes = 20
+    processes = []
+
+    for i in range(0, n_classes):
+        p = Process(target=main_f, args=(i, i % n_gpu))
+        processes.append(p)
+    # Start the processes
+    for p in processes:
+        p.start()
+    # Ensure all processes have finished execution
+    for p in processes:
+        p.join()
+
+    """
+    for iteration in range(0, int(n_classes / n_gpu)):
+        for i in range(n_gpu * iteration, n_gpu * (iteration + 1)):
+            p = Process(target=main_f, args=(i, i % 4))
+            processes.append(p)
+        # Start the processes
+        for p in processes:
+            p.start()
+        # Ensure all processes have finished execution
+        for p in processes:
+            p.join()
+    """
