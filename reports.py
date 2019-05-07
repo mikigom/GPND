@@ -1,5 +1,6 @@
 import os
 import json
+import statistics
 
 
 if __name__ == '__main__':
@@ -40,9 +41,14 @@ if __name__ == '__main__':
                 continue
 
             if metric not in results_dict[dataset_name][inliner_class].keys():
-                results_dict[dataset_name][inliner_class][metric] = 0
+                results_dict[dataset_name][inliner_class][metric] = []
 
-            results_dict[dataset_name][inliner_class][metric] += score/5
+            results_dict[dataset_name][inliner_class][metric].append(score)
+
+    for dataset_name in results_dict.keys():
+        for inliner_class in results_dict[dataset_name].keys():
+            for metric in results_dict[dataset_name][inliner_class].keys():
+                results_dict[dataset_name][inliner_class][metric] = statistics.mean(results_dict[dataset_name][inliner_class][metric])
 
     with open('reports.json', 'w') as fp:
         json.dump(results_dict, fp, sort_keys=True, indent=4)
